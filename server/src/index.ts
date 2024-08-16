@@ -1,13 +1,5 @@
 import express, { Express, Request, Response } from 'express'
-import {
-    FACEBOOK_APP_ID,
-    FACEBOOK_APP_SECRET,
-    FACEBOOK_CALLBACK_URL,
-    GOOGLE_CALLBACK_URL,
-    GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET,
-    PORT,
-} from './config/app.conf'
+import { PORT } from './config/app.conf'
 import cors from 'cors'
 import session from 'express-session'
 import passport from 'passport'
@@ -16,9 +8,8 @@ import authentication from './middlewares/authentication'
 import userController from './controllers/user.controller'
 import contentController from './controllers/content.controller'
 import articleController from './controllers/article.controller'
-
-const GoogleStrategy = require('passport-google-oauth').OAuth2Strategy
-const FacebookStrategy = require('passport-facebook').Strategy
+import { googleStrategy } from './libs/google-strategy'
+import { facebookStrategy } from './libs/facebook-strategy'
 
 const app: Express = express()
 const appV1 = express.Router()
@@ -43,12 +34,21 @@ appV1.use(
 appV1.use(passport.initialize())
 appV1.use(passport.session())
 
+passport.use(googleStrategy())
+passport.use(facebookStrategy())
+passport.serializeUser(function (user: any, cb: (err: any, id?: any) => void) {
+    cb(null, user)
+})
+passport.deserializeUser(function (obj: any, cb: (err: any, user?: any) => void) {
+    cb(null, obj)
+})
+
 appV1.get('/', (req: Request, res: Response) => {
     res.send('Astronacci API.')
 })
+
 appV1.get('/user/me', authentication, userController.getLoggedUser)
 appV1.post('/user/upgrade', authentication, userController.upgradeUser)
-
 appV1.get('/contents', authentication, contentController.findAll)
 appV1.get('/articles', authentication, articleController.findAll)
 
@@ -77,52 +77,6 @@ appV1.get(
     AuthController.facebookAuthCallback
 )
 appV1.get('/auth/facebook/login', AuthController.facebookLogin)
-
-passport.serializeUser(function (user: any, cb: (err: any, id?: any) => void) {
-    cb(null, user)
-})
-
-passport.deserializeUser(function (obj: any, cb: (err: any, user?: any) => void) {
-    cb(null, obj)
-})
-
-passport.use(
-    new GoogleStrategy(
-        {
-            clientID: GOOGLE_CLIENT_ID,
-            clientSecret: GOOGLE_CLIENT_SECRET,
-            callbackURL: GOOGLE_CALLBACK_URL,
-        },
-        function (
-            accessToken: string,
-            refreshToken: string,
-            profile: any,
-            done: (err: any, user?: any) => void
-        ) {
-            return done(null, profile)
-        }
-    )
-)
-
-passport.use(
-    new FacebookStrategy(
-        {
-            clientID: FACEBOOK_APP_ID,
-            clientSecret: FACEBOOK_APP_SECRET,
-            callbackURL: FACEBOOK_CALLBACK_URL,
-            scope: ['email', 'public_profile'],
-            profileFields: ['email', 'name', 'id'],
-        },
-        function (
-            accessToken: string,
-            refreshToken: string,
-            profile: any,
-            done: (err: any, user?: any) => void
-        ) {
-            return done(null, profile)
-        }
-    )
-)
 
 app.listen(port, () => {
     console.log(`[server]: Server is running at http://localhost:${port}`)
